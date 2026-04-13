@@ -18,13 +18,14 @@ import {
     Info,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { getProgrammingCourses, getProgrammingCourseBySlug, getCandidateProgress, startCourse } from '../../../services/programmingService';
-import axios from 'axios';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8003';
+import axiosInstance from '../../../config/axiosConfig';
+import { useToast } from '../../../context/ToastContext';
+import { paymentService } from '../../../services/paymentService';
+import { getProgrammingCourses, getProgrammingCourseBySlug, getCandidateProgress } from '../../../services/programmingService';
 
 const ProgrammingPage = () => {
     const { user } = useAuth();
+    const { showToast } = useToast();
     const [courses, setCourses] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -93,11 +94,27 @@ const ProgrammingPage = () => {
         if (!user?.id || !slug) return;
         setStartingCourse(true);
         try {
-            await axios.post(`${API_BASE}/api/programming/start-course`, {
+            // 1. Credit Deduction (Full Concepts Unlock - 50 Credits)
+            const creditRes = await paymentService.deductCredits({
+                serviceType: 'TECHNICAL',
+                serviceName: `Full Concepts Unlock - ${selectedCourse.name}`,
+                creditsToDeduct: 50,
+                metadata: { courseId: selectedCourse._id, slug: slug }
+            });
+
+            if (!creditRes.success) {
+                showToast(creditRes.message || 'Insufficient credits to unlock this course.', 'error');
+                setStartingCourse(false);
+                return;
+            }
+
+            await axiosInstance.post(`/api/programming/start-course`, {
                 candidateId: user.id,
                 courseSlug: slug,
                 courseId: selectedCourse._id
             });
+            
+            showToast('Success: 50 credits deducted. Course unlocked!', 'success');
             // Fetch fresh progress (summary)
             const progress = await getCandidateProgress(user.id, slug, { summary: true });
             setCourseProgress(progress);
@@ -110,6 +127,8 @@ const ProgrammingPage = () => {
             }
         } catch (err) {
             console.error('Failed to start course:', err);
+            const errorMsg = err.response?.data?.message || 'Failed to start course. Please try again.';
+            showToast(errorMsg, 'error');
         } finally {
             setStartingCourse(false);
         }
@@ -160,7 +179,7 @@ const ProgrammingPage = () => {
         setExpandedModule(isExpanded ? null : idx);
         if (!isExpanded && !moduleItems[idx]) {
             try {
-                const res = await axios.get(`${API_BASE}/api/programming/modules/${module._id}/items`);
+                const res = await axiosInstance.get(`/api/programming/modules/${module._id}/items`);
                 setModuleItems(prev => ({ ...prev, [idx]: res.data }));
             } catch (e) {
                 console.error('Failed to fetch module items', e);
@@ -282,8 +301,8 @@ const ProgrammingPage = () => {
 
     if (loading) {
         return (
-            <div className="w-full flex-1 flex flex-col bg-white dark:bg-black">
-                <div className="mx-3 md:mx-4 my-3 md:my-4 flex-1 flex items-center justify-center bg-gray-100 dark:bg-zinc-900 rounded-[20px] p-4 md:p-8 transition-colors duration-300">
+            <div className="w-full h-full flex flex-col bg-transparent">
+                <div className="flex-1 flex items-center justify-center px-1 py-2 md:py-3">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
             </div>
@@ -292,8 +311,8 @@ const ProgrammingPage = () => {
 
     if (selectedCourse) {
         return (
-            <div className="w-full flex flex-col bg-white dark:bg-black">
-                <div className="mx-3 md:mx-4 my-3 md:my-4 flex flex-col bg-gray-100 dark:bg-zinc-900 rounded-[20px] transition-colors duration-300">
+            <div className="w-full h-full flex flex-col bg-transparent">
+                <div className="flex-1 flex flex-col transition-colors duration-300">
                     {/* Top section: two-column header */}
                     <div className="w-full px-8 pt-8 pb-6 flex flex-col lg:flex-row gap-8 lg:gap-16 border-b border-gray-200 dark:border-white/10">
                         {/* Left: title + actions + description + progress */}
@@ -331,9 +350,11 @@ const ProgrammingPage = () => {
                                     <div className="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white dark:border-zinc-900"></div>
                                     <div className="w-6 h-6 rounded-full bg-purple-100 border-2 border-white dark:border-zinc-900"></div>
                                 </div>
-                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                    {courseProgress?.candidatesLiked ? courseProgress.candidatesLiked.toLocaleString() : '1,200+'} candidates enrolled
-                                </span>
+                                {courseProgress?.candidatesLiked && (
+                                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                        {courseProgress.candidatesLiked.toLocaleString()} candidates enrolled
+                                    </span>
+                                )}
                             </div>
 
                             {/* Course Progress — only shown once the candidate has started */}
@@ -362,10 +383,6 @@ const ProgrammingPage = () => {
                         {/* Right: Stats list */}
                         <div className="flex-[1] pt-2 lg:pt-10 shrink-0 lg:max-w-[260px]">
                             <div className="flex flex-col">
-                                <div className="flex items-center gap-3 py-3.5 border-b border-t border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200">
-                                    <Award className="h-4 w-4 shrink-0 text-gray-500" />
-                                    <span className="text-sm font-semibold">Earn a certificate of completion</span>
-                                </div>
                                 <div className="flex items-center gap-3 py-3.5 border-b border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200">
                                     <RotateCcw className="h-4 w-4 shrink-0 text-gray-500" />
                                     <div className="flex items-baseline gap-1">
@@ -544,8 +561,6 @@ const ProgrammingPage = () => {
                                                             return `${done} / ${module.lessonsCount || 0}`;
                                                         })()} concepts practiced
                                                     </span>
-                                                    <span className="text-gray-300 dark:text-gray-600">|</span>
-                                                    <button className="text-sm text-[#3b19ff] hover:underline font-medium">View cheatsheet</button>
                                                 </div>
                                             </div>
                                         )}
@@ -584,9 +599,9 @@ const ProgrammingPage = () => {
     }
 
     return (
-        <div className="w-full flex flex-col bg-white dark:bg-black">
-            <div className="mx-3 md:mx-4 my-3 md:my-4 bg-gray-100 dark:bg-zinc-900 rounded-[20px] p-3 md:p-5 transition-colors duration-300">
-                <div className="max-w-7xl mx-auto w-full">
+        <div className="w-full h-full flex flex-col bg-transparent">
+            <div className="flex-1 transition-colors duration-300">
+                <div className="w-full">
                     <header className="mb-6">
                         <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-1">Explore Programming Courses</h1>
                         <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Master the world's most popular technologies with hands-on practice.</p>

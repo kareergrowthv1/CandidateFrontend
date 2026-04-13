@@ -24,6 +24,35 @@ const ITEM_ICON = {
     informational: <Info className="h-3.5 w-3.5" />,
 };
 
+// ─── Syntax Highlighter ──────────────────────────────────────────────────
+const highlightJava = (code) => {
+    if (!code) return '';
+    let html = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Comments (Green)
+    html = html.replace(/(\/\/.*)/g, '<span style="color: #6a9955">$1</span>');
+    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span style="color: #6a9955">$1</span>');
+
+    // Strings (Orange/Brown)
+    html = html.replace(/("(?:\\.|[^"\\])*")(?![^<]*>)/g, '<span style="color: #ce9178">$1</span>');
+
+    // Keywords (Blue)
+    const keywords = ['public', 'private', 'protected', 'static', 'final', 'class', 'extends', 'implements', 'new', 'return', 'void', 'int', 'double', 'float', 'boolean', 'char', 'if', 'else', 'for', 'while', 'import', 'package', 'this', 'super', 'null', 'true', 'false'];
+    const keywordRegex = new RegExp(`\\b(${keywords.join('|')})\\b(?![^<]*>)`, 'g');
+    html = html.replace(keywordRegex, '<span style="color: #569cd6">$1</span>');
+
+    // Types / Classes (Greenish-Blue: Capitalized words)
+    html = html.replace(/\b([A-Z][a-zA-Z0-9_]+)\b(?![^<]*>)/g, '<span style="color: #4ec9b0">$1</span>');
+
+    // Numbers (Light Green)
+    html = html.replace(/\b(\d+)\b(?![^<]*>)/g, '<span style="color: #b5cea8">$1</span>');
+
+    return html;
+};
+
 // ─── Content Block Renderer ──────────────────────────────────────────────────
 function ContentRenderer({ blocks, completedCheckpoints = {}, level = 0 }) {
     const [openHints, setOpenHints] = useState({});
@@ -101,11 +130,19 @@ function ContentRenderer({ blocks, completedCheckpoints = {}, level = 0 }) {
                     case 'code_block':
                         return (
                             <div key={i} className="relative group/code my-3">
-                                <pre className="bg-[#1e1e3e] text-white text-[13px] rounded-sm p-4 overflow-x-auto font-mono leading-relaxed shadow-sm">
-                                    <code>{block.value}</code>
+                                <pre className="bg-black text-[#d4d4d4] text-[13px] rounded-sm p-4 overflow-x-auto font-mono leading-relaxed shadow-lg border border-white/5">
+                                    <code dangerouslySetInnerHTML={{ __html: highlightJava(block.value) }} />
                                 </pre>
-                                <div className="absolute top-3 right-3 opacity-0 group-hover/code:opacity-100 transition-opacity">
-                                    <FileText className="h-4 w-4 text-gray-300 pointer-events-none" />
+                                <div className="absolute top-3 right-3 opacity-0 group-hover/code:opacity-100 transition-opacity flex gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(block.value);
+                                        }}
+                                        className="p-1 hover:bg-white/10 rounded transition-colors"
+                                        title="Copy Code"
+                                    >
+                                        <Copy className="h-4 w-4 text-gray-400" />
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -276,32 +313,39 @@ export default function LessonPage() {
     const [output, setOutput] = useState('');
     const [outputError, setOutputError] = useState('');
     const [running, setRunning] = useState(false);
+    const [htmlPreviewCode, setHtmlPreviewCode] = useState('');
     const [outputHeight, setOutputHeight] = useState(180);
     const [candidateSkills, setCandidateSkills] = useState({});
 
     // Terminal State
-    const [terminalLines, setTerminalLines] = useState([
-        { type: 'output', value: 'Welcome to the Java Interactive Terminal.' },
-        { type: 'output', value: 'Type "javac filename.java" to compile and "java filename" to run.' },
-    ]);
+    const [terminalLines, setTerminalLines] = useState([]);
+
     const [terminalInput, setTerminalInput] = useState('');
     const [isCompiled, setIsCompiled] = useState(false);
     const [hasCheckedLs, setHasCheckedLs] = useState(false);
 
-    // Reset state when lesson changes
+    // Sync local lessonId with URL params
     useEffect(() => {
-        setTerminalLines([
-            { type: 'output', value: 'Welcome to the Java Interactive Terminal.' },
-            { type: 'output', value: 'Type "javac filename.java" to compile and "java filename" to run.' },
-        ]);
+        if (paramLessonId && paramLessonId !== lessonId) {
+            setLessonId(paramLessonId);
+        }
+    }, [paramLessonId]);
+
+    // Reset state when lesson changes (ID or Slugs)
+    useEffect(() => {
+        setTerminalLines([]);
+
         setTerminalInput('');
         setIsCompiled(false);
         setHasCheckedLs(false);
         setCompletedCheckpoints({});
         setOutput('');
         setOutputError('');
+        setHtmlPreviewCode('');
         setRunning(false);
-    }, [lessonId]);
+        // Important: Force loading state to show fresh fetch
+        setLoading(true);
+    }, [lessonId, paramLessonId, lessonSlug, moduleSlug]);
 
     const validateOutput = (text, criteria, code = '') => {
         if (!criteria?.length) return {};
@@ -651,6 +695,14 @@ export default function LessonPage() {
             updateCandidateProgress(user.id, slug, { [`savedCode.${lessonId}`]: code }).catch(e => console.error('Auto-save failed', e));
         }
 
+        // HTML: render in iframe preview instead of calling Judge0
+        if (lesson?.language === 'html') {
+            setOutputError('');
+            setOutput('');
+            setHtmlPreviewCode(code || '');
+            return;
+        }
+
         setRunning(true);
         setOutput('');
         setOutputError('');
@@ -743,19 +795,19 @@ export default function LessonPage() {
 
     if (loading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-[#1e1e1e]">
+            <div className="flex h-full min-h-[400px] items-center justify-center bg-[#1e1e1e]">
                 <div className="animate-spin h-8 w-8 rounded-full border-b-2 border-blue-400" />
             </div>
         );
     }
     if (!lesson) {
-        return <div className="flex h-screen items-center justify-center text-gray-400">Lesson not found.</div>;
+        return <div className="flex h-full min-h-[400px] items-center justify-center text-gray-400">Lesson not found.</div>;
     }
 
     return (
-        <div className="flex flex-col lg:h-[calc(100vh-64px)] w-full bg-white overflow-hidden lg:overflow-visible">
+        <div className="flex flex-col h-full w-full bg-transparent">
             {/* ── Main 2-column body ── */}
-            <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden bg-white">
+            <div className="flex flex-col lg:flex-row flex-1 bg-transparent">
 
                 {/* ── LEFT: Scrollable lesson content ── */}
                 <div className="w-full lg:w-1/2 flex flex-col shrink-0 lg:border-r border-gray-200 bg-white">
@@ -808,7 +860,7 @@ export default function LessonPage() {
                     <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#252526] shrink-0">
                         <div className="flex items-center gap-2 text-[11px] text-gray-400">
                             <FileText className="h-3.5 w-3.5" />
-                            <span>{lesson?.fileName || 'HelloWorld.java'}</span>
+                            <span>{lesson?.fileName || (lesson?.language === 'html' ? 'index.html' : 'script.js')}</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
@@ -879,11 +931,11 @@ export default function LessonPage() {
                             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                                 {lesson.isTerminal ? 'Terminal' : 'Output'}
                             </span>
-                            {((!lesson.isTerminal && (output || outputError)) || (lesson.isTerminal && terminalLines.length > 0)) && (
+                            {((!lesson.isTerminal && (output || outputError || (lesson?.language === 'html' && htmlPreviewCode))) || (lesson.isTerminal && terminalLines.length > 0)) && (
                                 <button
                                     onClick={() => {
                                         if (lesson.isTerminal) setTerminalLines([]);
-                                        else { setOutput(''); setOutputError(''); }
+                                        else { setOutput(''); setOutputError(''); setHtmlPreviewCode(''); }
                                     }}
                                     className="ml-auto text-[10px] text-gray-500 hover:text-gray-300"
                                 >
@@ -913,6 +965,20 @@ export default function LessonPage() {
                                         />
                                     </div>
                                 </div>
+                            ) : lesson?.language === 'html' ? (
+                                <>
+                                    {!htmlPreviewCode && (
+                                        <span className="text-gray-600">Click Run to view your webpage...</span>
+                                    )}
+                                    {htmlPreviewCode && (
+                                        <iframe
+                                            title="HTML preview"
+                                            srcDoc={htmlPreviewCode}
+                                            className="w-full h-full min-h-[200px] border-0 bg-white rounded"
+                                            sandbox="allow-scripts"
+                                        />
+                                    )}
+                                </>
                             ) : (
                                 <>
                                     {!output && !outputError && !running && (

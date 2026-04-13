@@ -10,7 +10,7 @@ let isSpeakingState = false;
 let currentUtterance = null;
 let cachedVoice = null;
 
-const notifyListeners = (isSpeaking) => {
+export const notifySpeechState = (isSpeaking) => {
     isSpeakingState = isSpeaking;
     listeners.forEach(fn => fn(isSpeaking));
 };
@@ -79,7 +79,7 @@ const loadVoices = () => {
 export const cancelSpeech = () => {
     window.speechSynthesis.cancel();
     currentUtterance = null;
-    notifyListeners(false);
+    notifySpeechState(false);
 };
 
 export const speakAsync = async (text) => {
@@ -109,12 +109,12 @@ export const speakAsync = async (text) => {
         utterance.volume = 1.0;
 
         utterance.onstart = () => {
-            notifyListeners(true);
+            notifySpeechState(true);
         };
 
         const finish = () => {
             currentUtterance = null;
-            notifyListeners(false);
+            notifySpeechState(false);
             resolve();
         };
 
