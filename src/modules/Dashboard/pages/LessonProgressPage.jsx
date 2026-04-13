@@ -19,7 +19,7 @@ export default function LessonProgressPage() {
     const [completedLessonTitles, setCompletedLessonTitles] = useState([]);
 
     // Skills data passed from previous page
-    const subskillTitle = location.state?.subskillTitle || "Write and compile basic Java programs.";
+    const subskillTitle = location.state?.subskillTitle || "Complete the module's key learning objectives.";
 
     useEffect(() => {
         const fetchData = async () => {

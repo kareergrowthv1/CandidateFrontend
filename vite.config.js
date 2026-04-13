@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 4003,
+      allowedHosts: true,
+      hmr: {
+        clientPort: 443
+      },
       proxy: {
         '/ai-ws': {
           target: aiWsProxyTarget,
@@ -41,6 +45,9 @@ export default defineConfig(({ mode }) => {
         '/candidate-status': { target: candidateBackendTarget, changeOrigin: true },
         '/candidates': { target: candidateBackendTarget, changeOrigin: true },
         '/health': { target: candidateBackendTarget, changeOrigin: true },
+        '/api': { target: candidateBackendTarget, changeOrigin: true },
+        // Streaming AI REST — resume content enhancement
+        '/resume-content': { target: 'http://localhost:9000', changeOrigin: true },
       },
     },
   }

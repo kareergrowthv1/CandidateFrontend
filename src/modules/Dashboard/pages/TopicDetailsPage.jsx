@@ -36,29 +36,6 @@ const CONTENT_TYPE_CONFIG = {
     video_link: { label: 'Video', Icon: Link2, color: 'text-rose-500', bg: 'bg-rose-50' },
 };
 
-// Placeholder content so topics without DB content still show useful info
-const PLACEHOLDER_CONTENT = {
-    java: [], // Now fetched from MongoDB
-    python: [
-        { type: 'article', title: 'Python Data Types', content: 'Python supports int, float, str, list, tuple, dict, set, and bool. Python is dynamically typed, so you don\'t need to declare types explicitly...' },
-        { type: 'snippet', title: 'List Comprehension', content: 'squares = [n**2 for n in range(10)]\nprint(squares)  # [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]' },
-        { type: 'article', title: 'Python Decorators', content: 'Decorators are a design pattern that allow you to modify the functionality of a function using another function...' },
-    ],
-    'react-js': [
-        { type: 'article', title: 'Understanding React Hooks', content: 'React Hooks are functions that let you "hook into" React state and lifecycle features from function components. The most common hooks are useState and useEffect...' },
-        { type: 'snippet', title: 'useState Example', content: 'import { useState } from "react";\n\nfunction Counter() {\n  const [count, setCount] = useState(0);\n  return <button onClick={() => setCount(c => c + 1)}>{count}</button>;\n}' },
-        { type: 'article', title: 'React Component Lifecycle', content: 'In function components, useEffect serves the purpose of the class-based lifecycle methods: componentDidMount, componentDidUpdate, and componentWillUnmount...' },
-    ],
-    'ai-ml': [
-        { type: 'video_link', title: 'Introduction to Neural Networks (3Blue1Brown)', content: 'https://www.youtube.com/watch?v=aircAruvnKk' },
-        { type: 'article', title: 'What is Machine Learning?', content: 'Machine Learning is a subset of AI where computer systems learn from data to perform specific tasks without being explicitly programmed. Types include Supervised, Unsupervised, and Reinforcement Learning...' },
-        { type: 'article', title: 'Key ML Algorithms', content: 'Linear Regression, Logistic Regression, Decision Trees, Random Forest, SVM, K-Means Clustering, and Neural Networks are the most commonly asked-about algorithms in interviews...' },
-    ],
-    devops: [
-        { type: 'article', title: 'DevOps Principles', content: 'DevOps bridges the gap between development and operations teams. Key principles include Continuous Integration (CI), Continuous Delivery (CD), Infrastructure as Code, and monitoring...' },
-        { type: 'article', title: 'Docker Basics', content: 'Docker is a platform for containerizing applications. A container bundles the code, dependencies, and runtime together so it can run consistently across environments...' },
-    ],
-};
 
 
 export default function TopicDetailsPage() {
@@ -116,10 +93,13 @@ export default function TopicDetailsPage() {
             return;
         }
 
-        const index = data.contents.findIndex(item => toSlug(item.title) === itemSlug);
+        // Try matching by slugified title first, then by raw _id string
+        let index = data.contents.findIndex(item => toSlug(item.title) === itemSlug);
+        if (index === -1) {
+            index = data.contents.findIndex(item => String(item._id) === itemSlug);
+        }
         if (index !== -1) {
             setActiveIndex(index);
-            // If item is found, also ensure the correct tab is active for html-css
             if (topicSlug === 'html-css') {
                 const item = data.contents[index];
                 if (item.order > 20) setActiveTab('css');
@@ -178,9 +158,7 @@ export default function TopicDetailsPage() {
     const colors = TOPIC_COLORS[topic.slug] || DEFAULT_COLORS;
     const IconComponent = ICON_MAP[topic.icon] || Database;
 
-    const displayContents = (contents && contents.length > 0)
-        ? contents
-        : (PLACEHOLDER_CONTENT[topic.slug] || []);
+    const displayContents = contents || [];
 
     const stripNumber = (title) => {
         if (!title) return '';
@@ -567,24 +545,20 @@ export default function TopicDetailsPage() {
     };
 
     return (
-        <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden font-sans bg-white dark:bg-black">
-            {/* Top Gap - for visual consistency with KnowledgeBase pages */}
-            <div className="h-3 md:h-4 shrink-0" />
-
-            {/* Main Content Area - Inner Gray Box (Static, Full Height) */}
-            <div className="mx-3 md:mx-4 mb-3 md:mb-4 flex-1 min-h-0 bg-gray-100 dark:bg-zinc-900 rounded-[20px] shadow-sm flex flex-col lg:flex-row overflow-hidden transition-colors duration-300">
-
-                {/* Main Content (Left) */}
-                <div className="flex-1 h-full min-h-0 overflow-y-auto p-2 md:px-5 md:py-6 bg-gray-100 dark:bg-zinc-900 border-r border-slate-200 dark:border-white/5">
-                    <div className="max-w-3xl mx-auto lg:ml-0">
+        <div className="flex-1 flex flex-col h-full overflow-hidden font-sans bg-transparent">
+            {/* Main Content Area */}
+            <div className="flex-1 h-full min-h-0 flex flex-col lg:flex-row gap-3 lg:gap-4 overflow-visible transition-colors duration-300">
+                {/* Main Content (Left Area - Transparent) */}
+                <div className="flex-1 h-full overflow-y-auto bg-transparent p-1 md:pl-1 md:pr-4 md:py-1 thin-scrollbar">
+                    <div className="max-w-4xl mx-auto lg:ml-0">
 
                         {renderContentBody(activeItem)}
                     </div>
                 </div>
 
-                {/* Sidebar Index (Right) */}
+                {/* Sidebar Index (Right Box) */}
                 <div className={`
-                    fixed lg:relative inset-y-0 right-0 z-40 w-72 lg:w-64 bg-white dark:bg-black border-l border-slate-200 dark:border-white/10 flex flex-col overflow-hidden shrink-0 transition-transform duration-300 lg:translate-x-0 shadow-2xl lg:shadow-none
+                    fixed lg:relative inset-y-0 right-0 z-40 w-72 lg:w-64 h-full bg-white dark:bg-zinc-950 rounded-[20px] border border-slate-200 dark:border-white/10 flex flex-col overflow-hidden shrink-0 transition-transform duration-300 lg:translate-x-0 shadow-sm
                     ${showIndexMobile ? 'translate-x-0' : 'translate-x-full'}
                 `}>
                     <div className="flex items-center justify-between p-4 lg:hidden border-b border-slate-100 dark:border-white/5">
@@ -593,7 +567,7 @@ export default function TopicDetailsPage() {
                             <ChevronRight className="h-5 w-5" />
                         </button>
                     </div>
-                    <div className="flex-1 h-full min-h-0 overflow-y-auto p-1.5 pt-4">
+                    <div className="flex-1 h-full min-h-0 overflow-y-auto p-1.5 pt-4 thin-scrollbar">
                         {/* HTML/CSS Toggle */}
                         {topicSlug === 'html-css' && (
                             <div className="px-2 mb-4">

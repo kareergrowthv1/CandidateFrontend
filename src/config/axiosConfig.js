@@ -14,6 +14,7 @@ import {
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 100000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -50,7 +51,7 @@ authAxiosInstance.interceptors.request.use(
   (config) => {
     const token = getAuthItem('accessToken');
     const xsrf = getAuthItem('xsrfToken');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (token && token !== 'null' && token !== 'undefined') config.headers.Authorization = `Bearer ${token}`;
     if (xsrf) config.headers['X-XSRF-Token'] = xsrf;
     return config;
   },
@@ -101,6 +102,7 @@ authAxiosInstance.interceptors.response.use(
 export const adminAxiosInstance = axios.create({
   baseURL: ADMIN_API_BASE_URL,
   timeout: 100000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -121,7 +123,7 @@ axiosInstance.interceptors.request.use(
 
     // Add Authorization header
     const token = getAuthItem('accessToken');
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -154,8 +156,8 @@ axiosInstance.interceptors.response.use(
       logError(error);
     }
 
-    // Handle 401/403 errors: clear session and redirect to login
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+    // Handle 401 errors: clear session and redirect to login
+    if (error.response && error.response.status === 401) {
       sessionStorage.clear();
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';

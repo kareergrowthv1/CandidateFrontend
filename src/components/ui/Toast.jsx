@@ -30,7 +30,7 @@ const Toast = ({ message, type = 'info', onClose, duration = 3000 }) => {
 
     return (
         <div className={twMerge(
-            "fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg transition-all duration-300 animate-in slide-in-from-right",
+            "fixed top-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg transition-all duration-300 animate-in slide-in-from-right",
             styles[type] || styles.info
         )}>
             {icons[type] || icons.info}

@@ -6,9 +6,12 @@ import {
   ChevronRight, MapPin, Briefcase, ExternalLink,
   Camera, Settings, LogOut, Play, Plus, Clock, Loader2, GraduationCap, HelpCircle
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { getCandidateProfile } from '../../../services/candidateService';
 import { getPracticeResponseStats } from '../../../services/codingPracticeService';
+import { paymentService } from '../../../services/paymentService';
+import BillingInvoiceModal from '../../../components/common/BillingInvoiceModal';
 
 const ProfilePage = () => {
   const { user, logout } = useAuth();
@@ -16,6 +19,11 @@ const ProfilePage = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile');
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const location = useLocation();
 
   useEffect(() => {
     async function fetchData() {
@@ -37,6 +45,29 @@ const ProfilePage = () => {
     }
     fetchData();
   }, [user?.id]);
+
+  const fetchBillingHistory = async () => {
+    try {
+      setBillingLoading(true);
+      const response = await paymentService.getHistory();
+      setPaymentHistory(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch billing history:', err);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'billing') {
+      setActiveTab('billing');
+      if (paymentHistory.length === 0) {
+        fetchBillingHistory();
+      }
+    }
+  }, [location.search]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Joined Recently';
@@ -101,12 +132,14 @@ const ProfilePage = () => {
     }
   }
 
+
+
   return (
     <motion.div
       initial="hidden"
       animate="visible"
       variants={containerVariants}
-      className="w-full max-w-full px-4 md:px-0 pt-6 md:pt-0 mx-auto space-y-6 pb-12"
+      className="w-full max-w-full mx-auto space-y-6 pb-4"
     >
       {/* Header Section - Mobile Optimized (Title Top, Buttons Below Flex-Wrap) */}
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -204,8 +237,14 @@ const ProfilePage = () => {
             ))}
           </motion.div>
 
-          {/* Info Card - Typography Hierarchy Swapped */}
-          <motion.div variants={itemVariants} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+
+          {/* Personal Details Card */}
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"
+          >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[14px] font-bold text-black uppercase tracking-widest">Personal Details</h3>
               <button className="text-[11px] font-bold text-orange-600 uppercase tracking-widest hover:underline decoration-1 underline-offset-4">Edit Profile</button>
@@ -233,8 +272,9 @@ const ProfilePage = () => {
             </div>
           </motion.div>
 
+
           {/* Resume & Documents */}
-          <motion.div variants={itemVariants} className="bg-[#020617] rounded-2xl p-6 shadow-xl text-white flex flex-col md:flex-row items-center gap-8 justify-between relative overflow-hidden group">
+          <motion.div variants={itemVariants} className="bg-[#020617] mt-5 rounded-2xl p-6 shadow-xl text-white flex flex-col md:flex-row items-center gap-8 justify-between relative overflow-hidden group">
             <div className="absolute -right-10 -bottom-10 p-4 opacity-[0.04] pointer-events-none group-hover:opacity-[0.08] transition-opacity">
               <FileText size={180} />
             </div>
@@ -322,6 +362,12 @@ const ProfilePage = () => {
           </div>
         </motion.div>
       </div>
+      
+      <BillingInvoiceModal
+        isOpen={!!selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+        invoice={selectedInvoice}
+      />
     </motion.div>
   );
 };

@@ -54,9 +54,9 @@ const MicrosoftIcon = () => (
   </svg>
 );
 
-const GithubIcon = () => (
-  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.58 9.58 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z" />
+const GithubIcon = ({ className = "w-7 h-7" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.58 9.58 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12c0-5.523-4.477-10-10-10z" />
   </svg>
 );
 
@@ -75,6 +75,9 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(() => {
     try { return localStorage.getItem('rememberMe') === 'true'; } catch { return true; }
   });
+  const [isNewCandidate, setIsNewCandidate] = useState(false);
+  const [secondaryIdentifier, setSecondaryIdentifier] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
   const handleIdentifierSubmit = async (e) => {
@@ -85,6 +88,7 @@ export default function Login() {
       return;
     }
     setBusy(true);
+    setIsNewCandidate(false);
     try {
       if (isMockIdentifier(key)) {
         showToast(`Mock: OTP sent. Use code: ${MOCK_CREDENTIALS.otp}`, 'info', 8000);
@@ -100,14 +104,14 @@ export default function Login() {
       if (data && data.existsInAuth) {
         setStep('password');
       } else {
-        // Not in auth_db, check if in college_candidates (CandidateBackend)
+        // Not in auth_db, check if in college_candidates (CandidateBackend) via details
         const detailsRes = await authAxiosInstance.post('/auth-session/candidate/details', {
           emailOrPhone: key,
           organizationId: CANDIDATE_DEFAULT_ORGANIZATION_ID
         });
         const candidate = detailsRes.data?.candidate;
         if (candidate) {
-          // Found in DB, send OTP to register
+          // Found in college DB, send OTP to register in Auth
           const otpRes = await authAxiosInstance.post('/auth-session/candidate/send-otp', { emailOrPhone: key });
           if (otpRes.data?.sent) {
             setCandidateName(candidate.candidate_name || '');
@@ -116,11 +120,29 @@ export default function Login() {
             showToast('Verification code sent to your ' + (key.includes('@') ? 'email' : 'phone') + '.', 'success');
           }
         } else {
-          showToast('Account not found. Please contact support or use a registered email.', 'error');
+          // Completely new candidate
+          setIsNewCandidate(true);
+          setStep('confirm-new');
         }
       }
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Check failed.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleNewAccountContinue = async () => {
+    setBusy(true);
+    try {
+      const otpRes = await authAxiosInstance.post('/auth-session/candidate/send-otp', { emailOrPhone: emailOrPhone.trim() });
+      if (otpRes.data?.sent) {
+        setIdentifierType(emailOrPhone.includes('@') ? 'email' : 'phone');
+        setStep('otp');
+        showToast('Verification code sent for your new account.', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to send verification code.', 'error');
     } finally {
       setBusy(false);
     }
@@ -198,21 +220,41 @@ export default function Login() {
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    if (!password) {
-      showToast('Please set a password.', 'error');
+    if (!candidateName.trim() || !password || !confirmPassword) {
+      showToast('All fields are required.', 'error');
       return;
     }
+    if (password !== confirmPassword) {
+      showToast('Passwords do not match.', 'error');
+      return;
+    }
+    if (isNewCandidate && !secondaryIdentifier.trim()) {
+      const field = emailOrPhone.includes('@') ? 'mobile number' : 'email';
+      showToast(`Please enter your ${field}.`, 'error');
+      return;
+    }
+
     setBusy(true);
     const storage = getStorage(rememberMe);
+    const isEmailInput = emailOrPhone.includes('@');
+    
     try {
-      const { data } = await authAxiosInstance.post('/auth-session/candidate/register', {
-        email: emailOrPhone.includes('@') ? emailOrPhone.trim() : undefined,
-        mobile_number: !emailOrPhone.includes('@') ? emailOrPhone.trim() : undefined,
+      const payload = {
         candidate_name: candidateName,
         password,
-        confirmPassword: password,
-        organizationId: CANDIDATE_DEFAULT_ORGANIZATION_ID
-      });
+        confirmPassword,
+        organizationId: isNewCandidate ? null : CANDIDATE_DEFAULT_ORGANIZATION_ID
+      };
+
+      if (isEmailInput) {
+        payload.email = emailOrPhone.trim();
+        if (isNewCandidate) payload.mobile_number = secondaryIdentifier.trim();
+      } else {
+        payload.mobile_number = emailOrPhone.trim();
+        if (isNewCandidate) payload.email = secondaryIdentifier.trim();
+      }
+
+      const { data } = await authAxiosInstance.post('/auth-session/candidate/register', payload);
       const d = data?.data;
       if (d?.accessToken) {
         storage.setItem('accessToken', d.accessToken);
@@ -222,7 +264,7 @@ export default function Login() {
         login(userData);
         if (rememberMe) localStorage.setItem('user', JSON.stringify(userData));
         showToast('Account set up successfully!', 'success');
-        navigate('/dashboard');
+        navigate('/subscription');
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Registration failed.', 'error');
@@ -232,7 +274,7 @@ export default function Login() {
   };
 
   const goBack = () => {
-    if (step === 'password' || step === 'otp') {
+    if (step === 'password' || step === 'otp' || step === 'confirm-new') {
       setStep('identifier');
       setPassword('');
       setOtp('');
@@ -291,6 +333,25 @@ export default function Login() {
                 </form>
               )}
 
+              {step === 'confirm-new' && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-slate-800">
+                      The account <span className="font-bold text-slate-900">{emailOrPhone}</span> is not registered yet. 
+                      Would you like to create a new candidate account?
+                    </p>
+                  </div>
+                  <div className="space-y-3 pt-2">
+                    <button onClick={handleNewAccountContinue} disabled={busy} className={btnCls}>
+                      {busy ? 'Proceeding…' : 'Yes, Create Account'}
+                    </button>
+                    <button onClick={goBack} className="w-full py-3 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors">
+                      Use different email
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {step === 'password' && (
                 <form onSubmit={handlePasswordSubmit} className="space-y-5">
                   <div className="space-y-2">
@@ -346,32 +407,84 @@ export default function Login() {
               )}
 
               {step === 'register' && (
-                <form onSubmit={handleRegisterSubmit} className="space-y-5">
-                  <div className="space-y-2">
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="space-y-1">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Set Account Password</label>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-slate-900">
+                        {isNewCandidate ? 'Create Your Account' : 'Set Account Password'}
+                      </label>
                       <button type="button" onClick={goBack} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline">Back</button>
                     </div>
+                  </div>
+
+                  {!isNewCandidate ? (
+                    <p className="text-[12px] font-medium text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      Hi <span className="font-bold text-slate-900">{candidateName || 'there'}</span>, please set a password to secure your account.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">Full Name</label>
+                        <input
+                          type="text"
+                          placeholder="Your full name"
+                          value={candidateName}
+                          onChange={(e) => setCandidateName(e.target.value)}
+                          className={inputCls}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">
+                          {emailOrPhone.includes('@') ? 'Mobile Number' : 'Email Address'}
+                        </label>
+                        <input
+                          type={emailOrPhone.includes('@') ? 'tel' : 'email'}
+                          placeholder={emailOrPhone.includes('@') ? 'e.g. 9876543210' : 'e.g. john@example.com'}
+                          value={secondaryIdentifier}
+                          onChange={(e) => setSecondaryIdentifier(e.target.value)}
+                          className={inputCls}
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">Set Password</label>
                     <div className="relative">
                       <input
                         type={showPwd ? 'text' : 'password'}
-                        placeholder="Create a strong password"
+                        placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className={`${inputCls} pr-12`}
+                        required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPwd((v) => !v)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-900 hover:text-black"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
                       >
                         {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1 pl-1">Hi {candidateName.split(' ')[0]}, please set a password to secure your account.</p>
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">Confirm Password</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={inputCls}
+                      required
+                    />
+                  </div>
+
                   <button type="submit" disabled={busy} className={btnCls}>
-                    {busy ? 'Setting up…' : 'Complete Setup'}
+                    {busy ? 'Setting up…' : (isNewCandidate ? 'Create Account' : 'Complete Setup')}
                   </button>
                 </form>
               )}
@@ -386,18 +499,47 @@ export default function Login() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-4 pt-2">
-                <button className="flex items-center justify-center p-1 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">or continue with</div>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
+                    window.location.href = `${authApi}/auth-session/google/authorize`;
+                  }}
+                  className="flex items-center justify-center w-12 h-12 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-sm"
+                >
                   <GoogleIcon />
                 </button>
-                <button className="flex items-center justify-center p-1 rounded-lg hover:bg-slate-50 transition-colors">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
+                    window.location.href = `${authApi}/auth-session/microsoft/authorize`;
+                  }}
+                  className="flex items-center justify-center w-12 h-12 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-sm"
+                >
                   <MicrosoftIcon />
                 </button>
-                <button className="flex items-center justify-center p-1 rounded-lg hover:bg-slate-50 transition-colors">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
+                    window.location.href = `${authApi}/auth-session/linkedin/authorize`;
+                  }}
+                  className="flex items-center justify-center w-12 h-12 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-sm"
+                >
                   <LinkedInIcon />
                 </button>
-                <button className="flex items-center justify-center p-1 rounded-lg hover:bg-slate-50 transition-colors">
-                  <GithubIcon />
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
+                    window.location.href = `${authApi}/auth-session/github/authorize`;
+                  }}
+                  className="flex items-center justify-center w-12 h-12 rounded-xl bg-[#24292e] hover:bg-black transition-all shadow-md group"
+                >
+                  <GithubIcon className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
                 </button>
               </div>
 
