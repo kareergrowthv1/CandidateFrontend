@@ -31,7 +31,7 @@ class STTService {
 
       // Use the proxy on 4003 which targets 9000 Streaming AI
       const wsPath = '/ws/test';
-      const wsUrl = (import.meta.env.VITE_AI_WS_URL || 'ws://localhost:4003/ai-ws').replace(/^http/, 'ws') + wsPath;
+      const wsUrl = `${import.meta.env.VITE_AI_WS_URL}`.replace(/^http/, 'ws') + wsPath;
       
       console.log('STT: Connecting to', wsUrl);
       this.ws = new WebSocket(wsUrl);

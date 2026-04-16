@@ -3,8 +3,9 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext';
+import { API_BASE_URL } from '../../../constants/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8003';
+const API_BASE = API_BASE_URL;
 
 export default function LessonProgressPage() {
     const location = useLocation();

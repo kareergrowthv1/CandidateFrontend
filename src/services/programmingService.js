@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003';
+import { API_BASE_URL } from '../constants/api';
 
 export const getProgrammingCourses = async () => {
     const response = await axios.get(`${API_BASE_URL}/api/programming/courses`);
