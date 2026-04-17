@@ -1,4 +1,7 @@
 Options -MultiViews
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+# Do not rewrite /api/ routes (let them go to backend)
+RewriteCond %{REQUEST_URI} !^/api/
 RewriteRule ^ index.html [QSA,L]
