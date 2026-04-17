@@ -422,9 +422,8 @@ export default function ResumeTemplatesPage() {
     const [selectionModal, setSelectionModal] = useState({ open: false, template: null });
 
     useEffect(() => {
-        fetch('/api/resume/templates')
-            .then(r => r.json())
-            .then(d => setTemplates(d.data || []))
+        axiosInstance.get('/api/resume/templates')
+            .then(r => setTemplates(r.data.data || []))
             .catch(() => showToast('Failed to load templates', 'error'))
             .finally(() => setIsLoading(false));
     }, [showToast]);
