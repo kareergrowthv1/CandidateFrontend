@@ -399,8 +399,8 @@ export default function Dashboard() {
     // 5. Resume Templates Fetch
     const fetchTemplates = async () => {
       try {
-        const res = await fetch('/api/resume/templates').then(r => r.json());
-        setRecentTemplates((res.data || []).slice(0, 6));
+        const res = await axiosInstance.get('/api/resume/templates');
+        setRecentTemplates((res.data.data || []).slice(0, 6));
       } catch (err) {
         console.warn('Templates fetch failed:', err.message);
       } finally {

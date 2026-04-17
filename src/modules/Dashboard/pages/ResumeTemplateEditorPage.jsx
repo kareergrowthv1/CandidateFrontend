@@ -519,8 +519,8 @@ export default function ResumeTemplateEditorPage() {
         (async () => {
             setTemplatesLoading(true);
             try {
-                const res = await fetch('/api/resume/templates').then(r => r.json());
-                setTemplates(res.data || []);
+                const res = await axiosInstance.get('/api/resume/templates');
+                setTemplates(res.data.data || []);
             } catch (err) {
                 console.error('Template fetch error:', err);
             } finally {
