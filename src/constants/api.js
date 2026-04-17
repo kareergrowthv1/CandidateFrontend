@@ -3,13 +3,21 @@
  */
 const e = import.meta.env;
 
-export const AUTH_API_BASE_URL = e.VITE_AUTH_API_URL || '';
-export const API_BASE_URL = e.VITE_API_BASE_URL || '';
-export const ADMIN_API_BASE_URL = e.VITE_ADMIN_API_URL || '';
-export const AI_BACKEND_URL = e.VITE_AI_BACKEND_URL || '';
-export const STREAMING_WS_BASE = (e.VITE_AI_BACKEND_URL || '').replace(/^http/, 'ws');
-export const AI_WS_URL = e.VITE_AI_WS_URL || '';
-export const CANDIDATE_DEFAULT_ORGANIZATION_ID = e.VITE_CANDIDATE_DEFAULT_ORGANIZATION_ID || '';
+const requireEnv = (key) => {
+  const value = String(e[key] || '').trim();
+  if (!value) {
+    throw new Error(`${key} is required in .env`);
+  }
+  return value.replace(/\/$/, '');
+};
+
+export const AUTH_API_BASE_URL = requireEnv('VITE_AUTH_API_URL');
+export const API_BASE_URL = requireEnv('VITE_API_BASE_URL');
+export const ADMIN_API_BASE_URL = requireEnv('VITE_ADMIN_API_URL');
+export const AI_BACKEND_URL = requireEnv('VITE_AI_BACKEND_URL');
+export const STREAMING_WS_BASE = AI_BACKEND_URL.replace(/^http/, 'ws');
+export const AI_WS_URL = requireEnv('VITE_AI_WS_URL');
+export const CANDIDATE_DEFAULT_ORGANIZATION_ID = String(e.VITE_CANDIDATE_DEFAULT_ORGANIZATION_ID || '').trim();
 
 export const API_ENDPOINTS = {
   // AdminBackend (VITE_ADMIN_API_URL) – verify, assessment-summaries, round-timing

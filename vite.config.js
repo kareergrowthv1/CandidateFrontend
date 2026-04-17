@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 import react from '@vitejs/plugin-react'
+import fs from 'fs'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -8,6 +9,14 @@ export default defineConfig(({ mode }) => {
   const aiWsProxyTarget = env.AI_WS_PROXY_TARGET || 'http://localhost:8087'
   // CandidateBackend (REST) – use for all candidate APIs; set VITE_API_BASE_URL to '' in dev to use this proxy
   const candidateBackendTarget = env.VITE_API_BASE_URL || 'http://localhost:8003'
+  const sslKeyPath = env.SSL_KEY_PATH
+  const sslCertPath = env.SSL_CERT_PATH
+  const httpsConfig = sslKeyPath && sslCertPath && fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)
+    ? {
+        key: fs.readFileSync(sslKeyPath),
+        cert: fs.readFileSync(sslCertPath),
+      }
+    : false
 
   return {
     plugins: [react()],
@@ -23,10 +32,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 4003,
+      host: '0.0.0.0',
+      https: httpsConfig,
       allowedHosts: true,
-      hmr: {
-        clientPort: 443
-      },
       proxy: {
         '/ai-ws': {
           target: aiWsProxyTarget,
@@ -47,7 +55,7 @@ export default defineConfig(({ mode }) => {
         '/health': { target: candidateBackendTarget, changeOrigin: true },
         '/api': { target: candidateBackendTarget, changeOrigin: true },
         // Streaming AI REST — resume content enhancement
-        '/resume-content': { target: 'http://localhost:9000', changeOrigin: true },
+        '/resume-content': { target: 'https://localhost:9443', changeOrigin: true },
       },
     },
   }

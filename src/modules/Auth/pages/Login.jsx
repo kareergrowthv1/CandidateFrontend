@@ -5,7 +5,7 @@ import { Eye, EyeOff, Star, Shield, Zap, Layout, ArrowRight } from 'lucide-react
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
 import { authAxiosInstance } from '../../../config/axiosConfig';
-import { CANDIDATE_DEFAULT_ORGANIZATION_ID } from '../../../constants/api';
+import { AUTH_API_BASE_URL, CANDIDATE_DEFAULT_ORGANIZATION_ID } from '../../../constants/api';
 import {
   MOCK_CREDENTIALS,
   isMockIdentifier,
@@ -504,8 +504,7 @@ export default function Login() {
                 <button 
                   type="button" 
                   onClick={() => {
-                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
-                    window.location.href = `${authApi}/auth-session/google/authorize`;
+                    window.location.href = `${AUTH_API_BASE_URL}/auth-session/google/authorize`;
                   }}
                   className="flex items-center justify-center w-12 h-12 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-sm"
                 >
@@ -514,8 +513,7 @@ export default function Login() {
                 <button 
                   type="button" 
                   onClick={() => {
-                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
-                    window.location.href = `${authApi}/auth-session/microsoft/authorize`;
+                    window.location.href = `${AUTH_API_BASE_URL}/auth-session/microsoft/authorize`;
                   }}
                   className="flex items-center justify-center w-12 h-12 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-sm"
                 >
@@ -524,8 +522,7 @@ export default function Login() {
                 <button 
                   type="button" 
                   onClick={() => {
-                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
-                    window.location.href = `${authApi}/auth-session/linkedin/authorize`;
+                    window.location.href = `${AUTH_API_BASE_URL}/auth-session/linkedin/authorize`;
                   }}
                   className="flex items-center justify-center w-12 h-12 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-sm"
                 >
@@ -534,8 +531,7 @@ export default function Login() {
                 <button 
                   type="button"
                   onClick={() => {
-                    const authApi = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001';
-                    window.location.href = `${authApi}/auth-session/github/authorize`;
+                    window.location.href = `${AUTH_API_BASE_URL}/auth-session/github/authorize`;
                   }}
                   className="flex items-center justify-center w-12 h-12 rounded-xl bg-[#24292e] hover:bg-black transition-all shadow-md group"
                 >

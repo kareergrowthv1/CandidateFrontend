@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { API_BASE_URL, AI_BACKEND_URL } from '../constants/api';
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8003'}/api`;
-const AI_BACKEND_URL = import.meta.env.VITE_AI_BACKEND_URL || 'http://localhost:9000';
+const API_URL = `${API_BASE_URL}/api`;
 
 const getHeaders = () => {
   const token = localStorage.getItem('accessToken');

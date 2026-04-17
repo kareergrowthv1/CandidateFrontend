@@ -6,9 +6,10 @@ import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext';
 import { updateCandidateProgress, markLessonComplete, markModuleComplete, getCandidateProgress } from '../../../services/programmingService';
 import { runPracticeCode } from '../../../services/codingPracticeService';
+import { API_BASE_URL } from '../../../constants/api';
 import { Cpu, Coffee, Globe, Trophy, Star, ArrowRight, Code, Check, X, RotateCcw, Copy } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8003';
+const API_BASE = API_BASE_URL;
 
 const fetchLesson = async (lessonId) => {
     const res = await axios.get(`${API_BASE}/api/programming/lessons/${lessonId}`);
