@@ -13,6 +13,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import AptitudeTestPortal from '../../Dashboard/components/AptitudeTestPortal';
 import { CONFIG_OPTIONS, QUESTION_COUNT, TOPIC_SUGGESTIONS } from '../constants';
+import { API_BASE_URL } from '../../../constants/api';
 
 const ROUND_CREDITS = {
   1: { 4: 10, 8: 15, 12: 25 }, // Communication
@@ -117,19 +118,92 @@ export default function AIBaseLayout({ round }) {
   const userInputRef = useRef('');
   const handleSendMessageRef = useRef(null);
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // ── Lifecycle & Termination ───────────────────────────────────────────────
+  const terminateSession = useCallback(async (isAborted = true) => {
+    // 1. Stop all browser activity immediately
+    isMountedRef.current = false;
+    sttService.stopListening();
+    cancelSpeech();
+    
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+    if (questionTimeoutRef.current) clearTimeout(questionTimeoutRef.current);
+    
+    // 2. Clear application state
+    setIsInterviewLive(false);
+    setIsAISending(false);
+
+    // 3. Mark session as aborted in backend if live
+    if (isAborted && isInterviewLive && startedAt) {
+      try {
+        const payload = {
+          candidateId: user?.id,
+          round: round?.id,
+          roundTitle: round?.title,
+          status: 'aborted',
+          startedAt,
+          completedAt: new Date().toISOString(),
+          questions: sessionAnswers,
+          isTerminated: true
+        };
+        // Use keepalive fetch to ensure the request finishes even if the tab closes.
+        // This is superior to sendBeacon because it supports Auth headers.
+        fetch(`${API_BASE_URL}/api/ai-mock/save-session`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                'X-Tenant-Id': localStorage.getItem('tenantId'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload),
+            keepalive: true
+        }).catch(e => console.warn('Failed to send keepalive termination:', e));
+      } catch (err) {
+        console.warn('Failed to signal session abortion:', err);
+      }
+    }
+  }, [isInterviewLive, startedAt, user, round, sessionAnswers]);
+
   useEffect(() => {
     isMountedRef.current = true;
     const unsubscribe = subscribeToSpeech((speaking) => {
       if (isMountedRef.current) setIsSpeaking(speaking);
     });
-    return () => {
-      isMountedRef.current = false;
-      unsubscribe();
-      cancelSpeech();
-      sttService.stopListening();
+
+    const handleBeforeUnload = (e) => {
+      if (isInterviewLive && startedAt) {
+        const payload = {
+          candidateId: user?.id,
+          round: round?.id,
+          roundTitle: round?.title,
+          status: 'aborted',
+          startedAt,
+          completedAt: new Date().toISOString(),
+          isTerminated: true,
+          questions: sessionAnswers
+        };
+
+        // Reliability: fetch with keepalive + explicit headers
+        fetch(`${API_BASE_URL}/api/ai-mock/save-session`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+            'X-Tenant-Id': localStorage.getItem('tenantId'),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
+        });
+      }
     };
-  }, []);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      terminateSession(true);
+      unsubscribe();
+    };
+  }, [isInterviewLive, startedAt, user, round, terminateSession]);
 
   useEffect(() => {
     if (messages.length === 0 && !isAISending && configStep === 'none') {
