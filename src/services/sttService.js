@@ -161,8 +161,6 @@ class STTService {
     
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'stop_listening' }));
-      this.ws.close();
-      this.ws = null;
     }
 
     if (this.scriptProcessor) {
