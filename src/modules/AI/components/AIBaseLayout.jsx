@@ -120,16 +120,60 @@ export default function AIBaseLayout({ round }) {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   useEffect(() => {
     isMountedRef.current = true;
+
+    // Warning before closing tab/refreshing
+    const handleBeforeUnload = (e) => {
+      if (isInterviewLive) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    // Auto-terminate on close/refresh
+    const handleUnload = () => {
+      if (isInterviewLive && user?.id) {
+        // Use sendBeacon for reliable delivery on page close
+        const tenantId = localStorage.getItem('tenantId');
+        const token = localStorage.getItem('accessToken');
+        const url = `${API_BASE_URL}/api/ai-mock/submit`;
+        const data = JSON.stringify({
+          candidateId: user.id,
+          round: round.id,
+          status: 'ABORTED',
+          feedback: 'Session terminated due to page refresh/close'
+        });
+        
+        const blob = new Blob([data], { type: 'application/json' });
+        navigator.sendBeacon(url, blob);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+
     const unsubscribe = subscribeToSpeech((speaking) => {
       if (isMountedRef.current) setIsSpeaking(speaking);
     });
+
     return () => {
       isMountedRef.current = false;
       unsubscribe();
       cancelSpeech();
       sttService.stopListening();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+      
+      // Handle navigation away (unmount but not refresh)
+      if (isInterviewLive) {
+        aiMockService.submitProgress({
+          candidateId: user.id,
+          round: round.id,
+          status: 'ABORTED',
+          feedback: 'Candidate navigated away from the interview page'
+        }).catch(err => console.warn('Termination failed:', err));
+      }
     };
-  }, []);
+  }, [isInterviewLive, user, round]);
 
   useEffect(() => {
     if (messages.length === 0 && !isAISending && configStep === 'none') {
