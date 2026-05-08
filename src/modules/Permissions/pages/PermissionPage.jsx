@@ -335,8 +335,32 @@ const PermissionPage = () => {
     // --- Step Logic ---
 
     const greetingStep = async () => {
-        const CANDIDATE_NAME = "Candidate";
-        const COMPANY_NAME = "KareerGrowth";
+        const toDisplayName = (value, fallback) => {
+            const raw = String(value || '').trim();
+            if (!raw) return fallback;
+            return raw
+                .replace(/\s+/g, ' ')
+                .split(' ')
+                .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        };
+
+        const verifiedSessionRaw = localStorage.getItem('verifiedSession');
+        let verifiedSession = null;
+        try {
+            verifiedSession = verifiedSessionRaw ? JSON.parse(verifiedSessionRaw) : null;
+        } catch (_) {
+            verifiedSession = null;
+        }
+
+        const CANDIDATE_NAME = toDisplayName(
+            sessionStorage.getItem('candidateName') || verifiedSession?.candidateName,
+            'Candidate'
+        );
+        const COMPANY_NAME = toDisplayName(
+            sessionStorage.getItem('companyName') || verifiedSession?.companyName,
+            'KareerGrowth'
+        );
 
         // Tiny delay to ensure voices load if first time (utility handles it partly but good to wait)
         await new Promise(r => setTimeout(r, 500));
