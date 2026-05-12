@@ -18,14 +18,6 @@ import dashboardPreview from '../../../assets/ai_resume.png'; // Use existing as
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 placeholder-slate-600 outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-50';
 const btnCls = 'relative w-full overflow-hidden rounded-xl py-4 text-sm font-black text-white shadow-lg transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 bg-blue-600 uppercase tracking-widest';
 
-/** Normalize mobile to 10 digits only (strip 91, +91, non-digits). */
-function toTenDigits(value) {
-  if (value == null || value === '') return '';
-  const digits = String(value).replace(/\D/g, '');
-  if (digits.length <= 10) return digits;
-  if (digits.startsWith('91') && digits.length > 10) return digits.slice(-10);
-  return digits.slice(0, 10);
-}
 
 const getStorage = (rememberMe) => (rememberMe ? localStorage : sessionStorage);
 
@@ -72,13 +64,101 @@ export default function Login() {
   const [candidateName, setCandidateName] = useState('');
   const [identifierType, setIdentifierType] = useState('email'); // 'email' | 'phone'
   const [showPwd, setShowPwd] = useState(false);
-  const [rememberMe, setRememberMe] = useState(() => {
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [rememberMe] = useState(() => {
     try { return localStorage.getItem('rememberMe') === 'true'; } catch { return true; }
   });
   const [isNewCandidate, setIsNewCandidate] = useState(false);
   const [secondaryIdentifier, setSecondaryIdentifier] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Forgot Password states
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
+
+  // Forgot Password handlers
+  const handleForgotEmailSubmit = async (e) => {
+    e.preventDefault();
+    const key = (resetEmail || '').trim();
+    if (!key) {
+      showToast('Enter your email or phone.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data } = await authAxiosInstance.post('/auth-session/candidate/forgot-password', {
+        emailOrPhone: key
+      });
+      if (data.sent) {
+        showToast('Verification code sent.', 'success');
+        setStep('forgot-otp');
+        if (data.otp) {
+          showToast(`Mock: OTP is ${data.otp}`, 'info', 8000);
+        }
+      } else {
+        showToast(data.message || 'Verification code sent to your email.', 'success');
+        setStep('forgot-otp');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to send reset code.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleForgotOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!resetOtp) {
+      showToast('Enter the verification code.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await authAxiosInstance.post('/auth-session/candidate/verify-otp', {
+        emailOrPhone: resetEmail.trim(),
+        otp: resetOtp
+      });
+      setStep('forgot-reset');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Invalid code.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleForgotResetSubmit = async (e) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      showToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+    if (newPassword !== confirmResetPassword) {
+      showToast('Passwords do not match.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await authAxiosInstance.post('/auth-session/candidate/reset-password', {
+        emailOrPhone: resetEmail.trim(),
+        otp: resetOtp,
+        newPassword
+      });
+      showToast('Password reset successful. Please log in.', 'success');
+      setStep('password');
+      setPassword('');
+      setResetEmail('');
+      setResetOtp('');
+      setNewPassword('');
+      setConfirmResetPassword('');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to reset password.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleIdentifierSubmit = async (e) => {
     e.preventDefault();
@@ -274,13 +354,17 @@ export default function Login() {
   };
 
   const goBack = () => {
-    if (step === 'password' || step === 'otp' || step === 'confirm-new') {
+    if (step === 'password' || step === 'otp' || step === 'confirm-new' || step === 'forgot-email') {
       setStep('identifier');
       setPassword('');
       setOtp('');
     } else if (step === 'register') {
       setStep('otp');
       setPassword('');
+    } else if (step === 'forgot-otp') {
+      setStep('forgot-email');
+    } else if (step === 'forgot-reset') {
+      setStep('forgot-otp');
     }
   };
 
@@ -374,6 +458,18 @@ export default function Login() {
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-900 hover:text-black"
                       >
                         {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    <div className="flex justify-end px-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetEmail(emailOrPhone);
+                          setStep('forgot-email');
+                        }}
+                        className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-wider"
+                      >
+                        Forgot Password?
                       </button>
                     </div>
                   </div>
@@ -473,18 +569,129 @@ export default function Login() {
 
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">Confirm Password</label>
-                    <input
-                      type="password"
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className={inputCls}
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPwd ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className={`${inputCls} pr-12`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPwd((v) => !v)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
+                      >
+                        {showConfirmPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
 
                   <button type="submit" disabled={busy} className={btnCls}>
                     {busy ? 'Setting up…' : (isNewCandidate ? 'Create Account' : 'Complete Setup')}
+                  </button>
+                </form>
+              )}
+
+              {step === 'forgot-email' && (
+                <form onSubmit={handleForgotEmailSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Reset Password</label>
+                      <button type="button" onClick={goBack} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline">Back</button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Enter your email or phone"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1 pl-1">We'll send you a code to reset your password.</p>
+                  </div>
+                  <button type="submit" disabled={busy} className={btnCls}>
+                    {busy ? 'Sending code…' : 'Continue'}
+                  </button>
+                </form>
+              )}
+
+              {step === 'forgot-otp' && (
+                <form onSubmit={handleForgotOtpSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Verification Code</label>
+                      <button type="button" onClick={goBack} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline">Back</button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Enter 6-digit code"
+                      maxLength={6}
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ''))}
+                      className={inputCls}
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1 pl-1">Enter the code sent to your email/phone.</p>
+                  </div>
+                  <button type="submit" disabled={busy} className={btnCls}>
+                    Continue
+                  </button>
+                </form>
+              )}
+
+              {step === 'forgot-reset' && (
+                <form onSubmit={handleForgotResetSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Create New Password</label>
+                      <button type="button" onClick={goBack} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline">Back</button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">New Password</label>
+                    <div className="relative">
+                      <input
+                        type={showPwd ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className={`${inputCls} pr-12`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd((v) => !v)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
+                      >
+                        {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">Confirm Password</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPwd ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={confirmResetPassword}
+                        onChange={(e) => setConfirmResetPassword(e.target.value)}
+                        className={`${inputCls} pr-12`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPwd((v) => !v)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
+                      >
+                        {showConfirmPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={busy} className={btnCls}>
+                    {busy ? 'Resetting…' : 'Reset Password'}
                   </button>
                 </form>
               )}
@@ -494,13 +701,12 @@ export default function Login() {
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-100 border-dashed"></div>
                 </div>
-                <div className="relative flex justify-center text-[10px] font-normal uppercase tracking-widest text-slate-900">
+                <div className="relative flex justify-center text-[10px] font-normal uppercase tracking-widest text-slate-400">
                   <span className="bg-white px-2">or continue with</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6 relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">or continue with</div>
+              <div className="flex items-center justify-center gap-4 pt-4 mt-6 relative">
                 <button 
                   type="button" 
                   onClick={() => {

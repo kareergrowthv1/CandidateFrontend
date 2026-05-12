@@ -338,7 +338,7 @@ const mapReportToTemplateDraft = (report, fileName, rawText = '') => {
             return (rawSections.hobbies || aiVal || '').trim();
         })(),
         // Capture everything else as custom sections
-        customSections: Object.keys(original)
+        custom_sections: Object.keys(original)
             .filter(key => ![
                 'about', 'experience', 'skills', 'tools', 'projects', 'education', 
                 'certificates', 'certifications', 'achievements', 'languages', 'hobbies',
@@ -389,7 +389,7 @@ const mapReportToTemplateDraft = (report, fileName, rawText = '') => {
         { id: 'sec-certs', title: 'Certification', source: 'certificates', enabled: resumeData.certificates.length > 0, location: 'full' },
         { id: 'sec-achievements', title: 'Achievements', source: 'achievements', enabled: resumeData.achievements.length > 0, location: 'full' },
         { id: 'sec-contacts', title: 'Personal Details', source: 'personal_info', enabled: hasContacts, location: 'full' },
-        ...resumeData.customSections.map(cs => ({
+        ...resumeData.custom_sections.map(cs => ({
             id: cs.id,
             title: cs.title,
             source: cs.id,

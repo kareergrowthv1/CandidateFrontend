@@ -1732,10 +1732,10 @@ export default function ResumeTemplateEditorPage() {
     );
 
     return (
-        <div className="min-h-screen bg-slate-100 flex flex-col relative">
+        <div className="h-screen bg-slate-100 flex flex-col relative overflow-hidden">
 
             {/* ── Top header ── */}
-            <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-4 shadow-sm">
+            <header className="shrink-0 z-30 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-4 shadow-sm">
                 <div className="flex items-center gap-3">
                     {/* Mobile Menu Toggle */}
                     <button
@@ -1776,7 +1776,7 @@ export default function ResumeTemplateEditorPage() {
             )}
 
             {/* ── Main split ── */}
-            <div className="flex flex-1 overflow-hidden gap-0">
+            <div className="flex flex-1 overflow-hidden h-full">
 
                 {/* ── Mobile Sidebar Drawer ── */}
                 <div className={`lg:hidden fixed inset-0 z-[100] flex transition-opacity duration-300 ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -1799,7 +1799,7 @@ export default function ResumeTemplateEditorPage() {
                 </div>
 
                 {/* ══ LEFT PANEL — Sections (Desktop) ═══════════════════════════ */}
-                <aside className="hidden lg:flex w-full max-w-[320px] min-w-[260px] bg-white border-r border-slate-100 flex-col overflow-hidden shrink-0">
+                <aside className="hidden lg:flex w-full max-w-[340px] min-w-[300px] bg-white border-r border-slate-200 flex-col overflow-hidden shrink-0 shadow-sm">
                     {editorSidebar}
                 </aside>
 
@@ -1807,7 +1807,7 @@ export default function ResumeTemplateEditorPage() {
                 <main className="flex-1 h-full overflow-hidden flex flex-col bg-slate-200">
 
                     {/* Preview toolbar */}
-                    <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between gap-3 shrink-0">
+                    <div className="shrink-0 z-10 bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] text-slate-500 uppercase tracking-wide font-medium">
                                 Live Preview
@@ -1848,14 +1848,14 @@ export default function ResumeTemplateEditorPage() {
                     </div>
 
                     {/* Preview area — A4 paged layout */}
-                    <div className="flex-1 overflow-x-auto overflow-y-auto bg-slate-300 flex flex-col items-center py-5 px-4 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto bg-slate-300 flex flex-col items-center py-8 px-4 custom-scrollbar scroll-smooth">
                         <div
-                            className="[--preview-scale:0.75] xl:[--preview-scale:0.85] 2xl:[--preview-scale:0.9] flex flex-col items-center origin-top-center transition-all"
+                            className="[--preview-scale:0.75] xl:[--preview-scale:0.85] 2xl:[--preview-scale:0.9] flex flex-col items-center origin-top transition-all"
                             style={{
                                 transform: 'scale(var(--preview-scale))',
                                 width: `${PAGE_BOX_W}px`,
                                 flexShrink: 0,
-                                marginBottom: '-100px' // Compensate for scaled phantom space
+                                // The transform-origin:top means we don't need negative margin if we use a wrapper with proper sizing
                             }}
                         >
                             <div

@@ -628,9 +628,16 @@ const DynamicTemplate = ({ data, accentColor: propAccentColor, templateConfig })
         : mergeWithDummy(data, cfg.dummyData || FALLBACK_DUMMY);
     const pi            = effectiveData?.personal_info || {};
 
-    const sections = (cfg.sections?.length > 0 ? cfg.sections : DEFAULT_SECTIONS)
+    const baseSections = (cfg.sections?.length > 0 ? cfg.sections : DEFAULT_SECTIONS)
         .filter(s => s.enabled !== false)
         .map(s => ({ ...s, id: s.id.replace(/^sec-/, '') }));
+
+    const customSecsFromData = Array.isArray(effectiveData.custom_sections)
+        ? effectiveData.custom_sections.map(cs => ({ id: cs.id, title: cs.title, enabled: true }))
+        : [];
+
+    // Combine base template sections with any custom sections extracted from the resume
+    const sections = [...baseSections, ...customSecsFromData];
 
     // Render a section heading + body block
     const renderSection = (sec, headingStyle = 'default', className = 'mb-5', inverted = false, extraStyles = {}, noBold = false, linkColor = null) => {
